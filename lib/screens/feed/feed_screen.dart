@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../constants/theme.dart';
 import '../../models/post_model.dart';
+import '../../providers/auth_provider.dart';
+import '../../services/post_service.dart';
+import '../../services/saved_posts_service.dart';
 import '../../widgets/post_card.dart';
 
 class FeedScreen extends StatefulWidget {
@@ -11,55 +15,180 @@ class FeedScreen extends StatefulWidget {
 }
 
 class _FeedScreenState extends State<FeedScreen> {
-  // Sample data matching the React Native version
-  final List<Post> _posts = [
-    Post(
-      id: '1',
-      title: 'Lost iPhone 13 Pro',
-      description: 'Lost my iPhone 13 Pro near the main library entrance.',
-      type: 'lost',
-      location: 'Main Library',
-      category: 'Electronics',
-      imageUrl:
-          'https://images.unsplash.com/photo-1510557880182-3d4d3cba35a5?auto=format&fit=crop&q=80&w=400',
-      userId: 'user1',
-      status: 'open',
-      createdAt: DateTime.now(),
-    ),
-    Post(
-      id: '2',
-      title: 'Found Blue Backpack',
-      description: 'Found a blue backpack at the Student Center.',
-      type: 'found',
-      location: 'Student Center',
-      category: 'Bags',
-      imageUrl:
-          'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&q=80&w=400',
-      userId: 'user2',
-      status: 'open',
-      createdAt: DateTime.now(),
-    ),
-  ];
+  final PostService _postService = PostService();
+  final SavedPostsService _savedService = SavedPostsService();
+  String? _filterType; // null = all, 'lost', 'found'
 
   @override
   Widget build(BuildContext context) {
+    final user = context.watch<AuthProvider>().user;
+
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: ListView.builder(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.m),
-        itemCount: _posts.length,
+      body: Column(
+        children: [
+          // Filter chips
+          Padding(
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.m, vertical: AppSpacing.s),
+            child: Row(
+              children: [
+                _buildFilterChip('All', null),
+                const SizedBox(width: 8),
+                _buildFilterChip('Lost', 'lost'),
+                const SizedBox(width: 8),
+                _buildFilterChip('Found', 'found'),
+              ],
+            ),
+          ),
+          // Posts list
+          Expanded(
+            child: StreamBuilder<List<Post>>(
+              stream: _postService.getPosts(type: _filterType),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                    child: CircularProgressIndicator(color: AppColors.primary),
+                  );
+                }
+
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.xl),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.error_outline,
+                              size: 48, color: AppColors.danger),
+                          const SizedBox(height: AppSpacing.m),
+                          Text(
+                            'Error loading posts:\n${snapshot.error}',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                final posts = snapshot.data ?? [];
+
+                if (posts.isEmpty) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.xl),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.search_off,
+                              size: 64,
+                              color: AppColors.textSecondary.withValues(alpha: 0.5)),
+                          const SizedBox(height: AppSpacing.m),
+                          const Text(
+                            'No posts yet',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.s),
+                          const Text(
+                            'Be the first to report a lost or found item!',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                return RefreshIndicator(
+                  color: AppColors.primary,
+                  onRefresh: () async {
+                    // StreamBuilder auto-refreshes, but we add a small delay for UX
+                    await Future.delayed(const Duration(milliseconds: 500));
+                  },
+                  child: _buildPostsList(posts, user?.uid),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPostsList(List<Post> posts, String? currentUserId) {
+    if (currentUserId == null) {
+      return ListView.builder(
+        padding: const EdgeInsets.only(bottom: AppSpacing.xl),
+        itemCount: posts.length,
         itemBuilder: (context, index) {
-          final post = _posts[index];
           return PostCard(
-            post: post,
-            onTap: () {
-              Navigator.of(context).pushNamed(
-                '/item-details',
-                arguments: post,
-              );
-            },
+            post: posts[index],
+            onTap: () => _navigateToDetails(posts[index]),
           );
         },
+      );
+    }
+
+    return StreamBuilder<List<String>>(
+      stream: _savedService.getSavedPostIds(currentUserId),
+      builder: (context, savedSnapshot) {
+        final savedIds = savedSnapshot.data ?? [];
+
+        return ListView.builder(
+          padding: const EdgeInsets.only(bottom: AppSpacing.xl),
+          itemCount: posts.length,
+          itemBuilder: (context, index) {
+            final post = posts[index];
+            return PostCard(
+              post: post,
+              isSaved: savedIds.contains(post.id),
+              onTap: () => _navigateToDetails(post),
+              onSave: () => _savedService.toggleSaved(currentUserId, post.id),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _navigateToDetails(Post post) {
+    Navigator.of(context).pushNamed('/item-details', arguments: post);
+  }
+
+  Widget _buildFilterChip(String label, String? type) {
+    final isActive = _filterType == type;
+    return GestureDetector(
+      onTap: () => setState(() => _filterType = type),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isActive ? AppColors.primary : AppColors.surface,
+          borderRadius: BorderRadius.circular(AppRadius.round),
+          border: Border.all(
+            color: isActive ? AppColors.primary : AppColors.border,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: isActive ? Colors.white : AppColors.textSecondary,
+          ),
+        ),
       ),
     );
   }

@@ -1,4 +1,4 @@
-package com.mycampus.found_lost_app
+package com.mycampus.lostfoundapp
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -54,6 +54,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
+  Future<void> _handleGoogleSignIn() async {
+    setState(() => _loading = true);
+    try {
+      await context.read<AuthProvider>().signInWithGoogle();
+      // If sign in is successful and user profile is created, we can navigate back or to home.
+      // Usually auth state changes will handle navigation via wrapper or router.
+    } catch (error) {
+      if (mounted) _showError(error.toString());
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -127,6 +140,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   title: 'Sign Up',
                   onPress: _handleRegister,
                   loading: _loading,
+                ),
+
+                const SizedBox(height: AppSpacing.m),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: OutlinedButton.icon(
+                    onPressed: _loading ? null : _handleGoogleSignIn,
+                    style: OutlinedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      side: const BorderSide(color: AppColors.primary),
+                    ),
+                    icon: Image.network(
+                      'https://developers.google.com/identity/images/g-logo.png',
+                      height: 24,
+                    ),
+                    label: const Text(
+                      'Sign in with Google',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
                 ),
 
                 const SizedBox(height: AppSpacing.xl),

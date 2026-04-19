@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   User? _user;
   Map<String, dynamic>? _profile;
@@ -36,6 +38,14 @@ class AuthProvider extends ChangeNotifier {
     await _authService.login(email, password);
   }
 
+  Future<void> signInWithGoogle() async {
+    final userCredential = await _authService.signInWithGoogle();
+    if (userCredential != null) {
+      _profile = await _authService.getUserProfile(userCredential.user!.uid);
+      notifyListeners();
+    }
+  }
+
   Future<void> register(String email, String password, String name) async {
     final userCredential = await _authService.register(email, password, name);
     _profile = {
@@ -45,6 +55,21 @@ class AuthProvider extends ChangeNotifier {
       'createdAt': DateTime.now().toIso8601String(),
       'profileImage': null,
     };
+    notifyListeners();
+  }
+
+  /// Update user profile data in Firestore and refresh local cache.
+  Future<void> updateProfile(Map<String, dynamic> data) async {
+    if (_user == null) return;
+    await _db.collection('users').doc(_user!.uid).update(data);
+    _profile = {...?_profile, ...data};
+    notifyListeners();
+  }
+
+  /// Refresh profile from Firestore.
+  Future<void> refreshProfile() async {
+    if (_user == null) return;
+    _profile = await _authService.getUserProfile(_user!.uid);
     notifyListeners();
   }
 

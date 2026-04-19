@@ -7,7 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "com.mycampus.found_lost_app"
+    namespace = "com.mycampus.lostfoundapp"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -21,8 +21,8 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.mycampus.found_lost_app"
-        minSdk = 23
+        applicationId = "com.mycampus.lostfoundapp"
+        minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

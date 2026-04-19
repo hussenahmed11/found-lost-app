@@ -6,8 +6,16 @@ import '../models/post_model.dart';
 class PostCard extends StatelessWidget {
   final Post post;
   final VoidCallback? onTap;
+  final VoidCallback? onSave;
+  final bool isSaved;
 
-  const PostCard({super.key, required this.post, this.onTap});
+  const PostCard({
+    super.key,
+    required this.post,
+    this.onTap,
+    this.onSave,
+    this.isSaved = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +49,8 @@ class PostCard extends StatelessWidget {
                         ? Image.network(
                             post.imageUrl!,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, _a) => Container(
+                            errorBuilder: (context, error, stackTrace) =>
+                                Container(
                               color: AppColors.border,
                               child: const Icon(Icons.image,
                                   color: AppColors.textSecondary),
@@ -63,7 +72,7 @@ class PostCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        // Header row: badge + category
+                        // Header row: badge + bookmark
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -86,13 +95,33 @@ class PostCard extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            Text(
-                              post.category,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: AppColors.textSecondary,
-                                fontWeight: FontWeight.w500,
-                              ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  post.category,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.textSecondary,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                if (onSave != null) ...[
+                                  const SizedBox(width: 4),
+                                  GestureDetector(
+                                    onTap: onSave,
+                                    child: Icon(
+                                      isSaved
+                                          ? Icons.bookmark
+                                          : Icons.bookmark_outline,
+                                      size: 20,
+                                      color: isSaved
+                                          ? AppColors.primary
+                                          : AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
                           ],
                         ),
@@ -103,7 +132,7 @@ class PostCard extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            fontSize: 18,
+                            fontSize: 16,
                             fontWeight: FontWeight.w700,
                             color: AppColors.textPrimary,
                           ),

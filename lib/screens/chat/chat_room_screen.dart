@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../constants/theme.dart';
 import '../../models/message_model.dart';
 import '../../providers/auth_provider.dart';
@@ -21,8 +22,29 @@ class ChatRoomScreen extends StatefulWidget {
 
 class _ChatRoomScreenState extends State<ChatRoomScreen> {
   final ChatService _chatService = ChatService();
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
   final TextEditingController _inputController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  String _otherUserName = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOtherUserName();
+  }
+
+  Future<void> _loadOtherUserName() async {
+    try {
+      final doc =
+          await _db.collection('users').doc(widget.otherUserId).get();
+      if (doc.exists && mounted) {
+        setState(
+            () => _otherUserName = doc.data()?['name'] ?? 'User');
+      }
+    } catch (_) {
+      if (mounted) setState(() => _otherUserName = 'User');
+    }
+  }
 
   @override
   void dispose() {
@@ -60,9 +82,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().user;
-    final displayName = widget.otherUserId.length >= 5
-        ? widget.otherUserId.substring(0, 5)
-        : widget.otherUserId;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -82,12 +101,12 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 children: [
                   IconButton(
                     icon: const Icon(Icons.chevron_left,
-                        size: 24, color: AppColors.textPrimary),
+                        size: 28, color: AppColors.textPrimary),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                   Expanded(
                     child: Text(
-                      'User $displayName',
+                      _otherUserName.isNotEmpty ? _otherUserName : 'Chat',
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         fontSize: 18,
@@ -111,6 +130,29 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                   if (messages.isNotEmpty) {
                     WidgetsBinding.instance
                         .addPostFrameCallback((_) => _scrollToBottom());
+                  }
+
+                  if (messages.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.chat_outlined,
+                              size: 48,
+                              color: AppColors.textSecondary
+                                  .withValues(alpha: 0.5)),
+                          const SizedBox(height: AppSpacing.m),
+                          const Text(
+                            'No messages yet.\nSay hello! 👋',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
                   }
 
                   return ListView.builder(
@@ -150,6 +192,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                         controller: _inputController,
                         maxLines: null,
                         style: const TextStyle(fontSize: 16),
+                        textInputAction: TextInputAction.send,
+                        onSubmitted: (_) => _handleSend(),
                         decoration: const InputDecoration(
                           hintText: 'Type a message...',
                           contentPadding: EdgeInsets.symmetric(
@@ -200,6 +244,13 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             bottomLeft: Radius.circular(isMine ? AppRadius.l : 4),
             bottomRight: Radius.circular(isMine ? 4 : AppRadius.l),
           ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.end,

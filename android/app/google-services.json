@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "831668276653-8h2rft57uei74n674alod1d6tol5l5h2.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.mycampus.lostfoundapp",
+            "certificate_hash": "633d9498a17750ddf7ae15b79b6e16d8724cfcdf"
+          }
+        },
+        {
           "client_id": "831668276653-4r51ir35n14q8a1on8d0omrp19ibdoj6.apps.googleusercontent.com",
           "client_type": 3
         }

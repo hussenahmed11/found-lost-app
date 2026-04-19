@@ -1,33 +1,115 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:provider/provider.dart';
 import '../../constants/theme.dart';
 import '../../models/post_model.dart';
+import '../../providers/auth_provider.dart';
+import '../../services/chat_service.dart';
+import '../../services/saved_posts_service.dart';
 import '../../widgets/app_button.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-class ItemDetailsScreen extends StatelessWidget {
+class ItemDetailsScreen extends StatefulWidget {
   final Post post;
 
   const ItemDetailsScreen({super.key, required this.post});
 
-  void _handleContact(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Chat system will be initialized with the owner.'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+  @override
+  State<ItemDetailsScreen> createState() => _ItemDetailsScreenState();
+}
+
+class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
+  final ChatService _chatService = ChatService();
+  final SavedPostsService _savedService = SavedPostsService();
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  bool _isSaved = false;
+  bool _contactLoading = false;
+  Map<String, dynamic>? _posterProfile;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPosterProfile();
+    _checkIfSaved();
+  }
+
+  Future<void> _loadPosterProfile() async {
+    try {
+      final doc =
+          await _db.collection('users').doc(widget.post.userId).get();
+      if (doc.exists && mounted) {
+        setState(() => _posterProfile = doc.data());
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _checkIfSaved() async {
+    final user = context.read<AuthProvider>().user;
+    if (user == null) return;
+    final saved = await _savedService.isSaved(user.uid, widget.post.id);
+    if (mounted) setState(() => _isSaved = saved);
+  }
+
+  Future<void> _handleContact() async {
+    final user = context.read<AuthProvider>().user;
+    if (user == null) return;
+
+    // Don't let user chat with themselves
+    if (user.uid == widget.post.userId) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This is your own post.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _contactLoading = true);
+    try {
+      final chatId =
+          await _chatService.createOrGetChat(user.uid, widget.post.userId);
+      if (mounted) {
+        Navigator.of(context).pushNamed('/chat-room', arguments: {
+          'chatId': chatId,
+          'otherUserId': widget.post.userId,
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error starting chat: $error'),
+            backgroundColor: AppColors.danger,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _contactLoading = false);
+    }
+  }
+
+  Future<void> _toggleSave() async {
+    final user = context.read<AuthProvider>().user;
+    if (user == null) return;
+    await _savedService.toggleSaved(user.uid, widget.post.id);
+    if (mounted) setState(() => _isSaved = !_isSaved);
   }
 
   void _handleShare() {
     Share.share(
-      'Check out this ${post.type} item: ${post.title} at ${post.location}',
+      'Check out this ${widget.post.type} item: ${widget.post.title} at ${widget.post.location}',
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final isLost = post.type == 'lost';
+    final isLost = widget.post.type == 'lost';
+    final posterName = _posterProfile?['name'] ?? 'Loading...';
+    final posterImage = _posterProfile?['profileImage'];
+    final posterDate = _posterProfile?['createdAt'];
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -45,14 +127,16 @@ class ItemDetailsScreen extends StatelessWidget {
                       children: [
                         // Hero image
                         Positioned.fill(
-                          child: post.imageUrl != null
-                              ? Image.network(post.imageUrl!,
+                          child: widget.post.imageUrl != null
+                              ? Image.network(widget.post.imageUrl!,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (_, __, _a) => Container(
-                                      color: AppColors.border,
-                                      child: const Icon(Icons.image,
-                                          size: 60,
-                                          color: AppColors.textSecondary)))
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      Container(
+                                          color: AppColors.border,
+                                          child: const Icon(Icons.image,
+                                              size: 60,
+                                              color:
+                                                  AppColors.textSecondary)))
                               : Container(
                                   color: AppColors.border,
                                   child: const Icon(Icons.image,
@@ -61,20 +145,31 @@ class ItemDetailsScreen extends StatelessWidget {
                         ),
                         // Back button
                         Positioned(
-                          top: 50,
+                          top: MediaQuery.of(context).padding.top + 8,
                           left: 20,
                           child: _circleButton(
                             icon: Icons.chevron_left,
                             onTap: () => Navigator.of(context).pop(),
                           ),
                         ),
-                        // Share button
+                        // Actions row
                         Positioned(
-                          top: 50,
+                          top: MediaQuery.of(context).padding.top + 8,
                           right: 20,
-                          child: _circleButton(
-                            icon: Icons.share,
-                            onTap: _handleShare,
+                          child: Row(
+                            children: [
+                              _circleButton(
+                                icon: _isSaved
+                                    ? Icons.bookmark
+                                    : Icons.bookmark_outline,
+                                onTap: _toggleSave,
+                              ),
+                              const SizedBox(width: 8),
+                              _circleButton(
+                                icon: Icons.share,
+                                onTap: _handleShare,
+                              ),
+                            ],
                           ),
                         ),
                         // Type badge
@@ -92,7 +187,7 @@ class ItemDetailsScreen extends StatelessWidget {
                                   BorderRadius.circular(AppRadius.round),
                             ),
                             child: Text(
-                              post.type.toUpperCase(),
+                              widget.post.type.toUpperCase(),
                               style: const TextStyle(
                                 color: AppColors.surface,
                                 fontWeight: FontWeight.w800,
@@ -127,7 +222,7 @@ class ItemDetailsScreen extends StatelessWidget {
                             children: [
                               Expanded(
                                 child: Text(
-                                  post.title,
+                                  widget.post.title,
                                   style: const TextStyle(
                                     fontSize: 24,
                                     fontWeight: FontWeight.w800,
@@ -150,7 +245,7 @@ class ItemDetailsScreen extends StatelessWidget {
                                         size: 12, color: AppColors.primary),
                                     const SizedBox(width: 4),
                                     Text(
-                                      post.category,
+                                      widget.post.category,
                                       style: const TextStyle(
                                         fontSize: 12,
                                         color: AppColors.primary,
@@ -169,9 +264,9 @@ class ItemDetailsScreen extends StatelessWidget {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               _statChip(
-                                  Icons.location_on, post.location),
+                                  Icons.location_on, widget.post.location),
                               _statChip(Icons.calendar_today,
-                                  DateFormat.yMMMd().format(post.createdAt)),
+                                  DateFormat.yMMMd().format(widget.post.createdAt)),
                             ],
                           ),
 
@@ -195,8 +290,8 @@ class ItemDetailsScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: AppSpacing.m),
                           Text(
-                            post.description.isNotEmpty
-                                ? post.description
+                            widget.post.description.isNotEmpty
+                                ? widget.post.description
                                 : 'No description provided.',
                             style: const TextStyle(
                               fontSize: 16,
@@ -233,6 +328,7 @@ class ItemDetailsScreen extends StatelessWidget {
                             ),
                             child: Row(
                               children: [
+                                // Avatar
                                 Container(
                                   width: 50,
                                   height: 50,
@@ -241,30 +337,45 @@ class ItemDetailsScreen extends StatelessWidget {
                                     borderRadius: BorderRadius.circular(
                                         AppRadius.round),
                                   ),
-                                  child: const Icon(Icons.person,
-                                      size: 24,
-                                      color: AppColors.textSecondary),
+                                  child: posterImage != null
+                                      ? ClipRRect(
+                                          borderRadius: BorderRadius.circular(
+                                              AppRadius.round),
+                                          child: Image.network(
+                                            posterImage,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) =>
+                                                const Icon(Icons.person,
+                                                    size: 24,
+                                                    color: AppColors
+                                                        .textSecondary),
+                                          ),
+                                        )
+                                      : const Icon(Icons.person,
+                                          size: 24,
+                                          color: AppColors.textSecondary),
                                 ),
                                 const SizedBox(width: AppSpacing.m),
-                                const Column(
+                                Column(
                                   crossAxisAlignment:
                                       CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'User Name',
-                                      style: TextStyle(
+                                      posterName,
+                                      style: const TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.w700,
                                         color: AppColors.textPrimary,
                                       ),
                                     ),
-                                    Text(
-                                      'Member since April 2024',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: AppColors.textSecondary,
+                                    if (posterDate != null)
+                                      Text(
+                                        'Member since ${posterDate.toString().substring(0, 10)}',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.textSecondary,
+                                        ),
                                       ),
-                                    ),
                                   ],
                                 ),
                               ],
@@ -281,7 +392,12 @@ class ItemDetailsScreen extends StatelessWidget {
 
           // Footer with contact button
           Container(
-            padding: const EdgeInsets.all(AppSpacing.l),
+            padding: EdgeInsets.only(
+              left: AppSpacing.l,
+              right: AppSpacing.l,
+              top: AppSpacing.m,
+              bottom: MediaQuery.of(context).padding.bottom + AppSpacing.m,
+            ),
             decoration: const BoxDecoration(
               color: AppColors.surface,
               border: Border(
@@ -290,7 +406,8 @@ class ItemDetailsScreen extends StatelessWidget {
             ),
             child: AppButton(
               title: 'Contact Owner',
-              onPress: () => _handleContact(context),
+              onPress: _handleContact,
+              loading: _contactLoading,
             ),
           ),
         ],
@@ -305,8 +422,14 @@ class ItemDetailsScreen extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.8),
+          color: Colors.white.withValues(alpha: 0.85),
           shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 4,
+            ),
+          ],
         ),
         child: Icon(icon, size: 24, color: AppColors.textPrimary),
       ),

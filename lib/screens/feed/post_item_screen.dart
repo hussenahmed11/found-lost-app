@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 import 'dart:io';
 import '../../constants/theme.dart';
+import '../../providers/auth_provider.dart';
+import '../../services/post_service.dart';
 import '../../widgets/app_input.dart';
 import '../../widgets/app_button.dart';
 
 class PostItemScreen extends StatefulWidget {
-  const PostItemScreen({super.key});
+  final VoidCallback? onPostSuccess;
+
+  const PostItemScreen({super.key, this.onPostSuccess});
 
   @override
   State<PostItemScreen> createState() => _PostItemScreenState();
@@ -17,6 +22,7 @@ class _PostItemScreenState extends State<PostItemScreen> {
   final _descriptionController = TextEditingController();
   final _categoryController = TextEditingController();
   final _locationController = TextEditingController();
+  final PostService _postService = PostService();
   String _type = 'lost';
   File? _image;
   bool _loading = false;
@@ -43,33 +49,90 @@ class _PostItemScreenState extends State<PostItemScreen> {
   }
 
   Future<void> _handleSubmit() async {
-    if (_titleController.text.isEmpty ||
-        _descriptionController.text.isEmpty ||
-        _categoryController.text.isEmpty ||
-        _locationController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please fill in all fields'),
-          backgroundColor: AppColors.danger,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+    // Validation
+    if (_titleController.text.trim().isEmpty) {
+      _showError('Please enter a title');
+      return;
+    }
+    if (_descriptionController.text.trim().isEmpty) {
+      _showError('Please enter a description');
+      return;
+    }
+    if (_categoryController.text.trim().isEmpty) {
+      _showError('Please enter a category');
+      return;
+    }
+    if (_locationController.text.trim().isEmpty) {
+      _showError('Please enter a location');
+      return;
+    }
+
+    final user = context.read<AuthProvider>().user;
+    if (user == null) {
+      _showError('You must be logged in to post');
       return;
     }
 
     setState(() => _loading = true);
-    // Logic will connect to Firebase in production
-    await Future.delayed(const Duration(milliseconds: 1500));
-    if (mounted) {
-      setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Item posted successfully'),
-          backgroundColor: AppColors.secondary,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+
+    try {
+      final postData = {
+        'title': _titleController.text.trim(),
+        'description': _descriptionController.text.trim(),
+        'type': _type,
+        'category': _categoryController.text.trim(),
+        'location': _locationController.text.trim(),
+      };
+
+      await _postService.createPost(user.uid, postData, _image?.path);
+
+      if (mounted) {
+        // Clear form
+        _titleController.clear();
+        _descriptionController.clear();
+        _categoryController.clear();
+        _locationController.clear();
+        setState(() {
+          _image = null;
+          _type = 'lost';
+          _loading = false;
+        });
+
+        // Show success
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 8),
+                Text('Item posted successfully!'),
+              ],
+            ),
+            backgroundColor: AppColors.secondary,
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 2),
+          ),
+        );
+
+        // Switch to Feed tab
+        widget.onPostSuccess?.call();
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() => _loading = false);
+        _showError('Failed to post item: $error');
+      }
     }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppColors.danger,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   @override
@@ -113,19 +176,49 @@ class _PostItemScreenState extends State<PostItemScreen> {
                 child: _image != null
                     ? ClipRRect(
                         borderRadius: BorderRadius.circular(AppRadius.l),
-                        child: Image.file(_image!, fit: BoxFit.cover),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            Image.file(_image!, fit: BoxFit.cover),
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: GestureDetector(
+                                onTap: () => setState(() => _image = null),
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.5),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.close,
+                                      color: Colors.white, size: 18),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       )
-                    : const Column(
+                    : Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(Icons.camera_alt,
-                              size: 40, color: AppColors.textSecondary),
-                          SizedBox(height: 8),
-                          Text(
-                            'Add Photo',
+                              size: 40,
+                              color: AppColors.textSecondary.withValues(alpha: 0.6)),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Add Photo (optional)',
                             style: TextStyle(
                               color: AppColors.textSecondary,
                               fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Tap to select from gallery',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary.withValues(alpha: 0.6),
                             ),
                           ),
                         ],
@@ -135,31 +228,31 @@ class _PostItemScreenState extends State<PostItemScreen> {
             const SizedBox(height: AppSpacing.s),
 
             AppInput(
-              label: 'Title',
+              label: 'Title *',
               placeholder: 'e.g. Lost Wallet, Found Keys',
               controller: _titleController,
             ),
             AppInput(
-              label: 'Description',
+              label: 'Description *',
               placeholder: 'Provide more details about the item...',
               controller: _descriptionController,
               maxLines: 4,
               height: 100,
             ),
             AppInput(
-              label: 'Category',
+              label: 'Category *',
               placeholder: 'Electronics, Bags, IDs, etc.',
               controller: _categoryController,
             ),
             AppInput(
-              label: 'Location',
+              label: 'Location *',
               placeholder: 'Where was it lost or found?',
               controller: _locationController,
             ),
 
             const SizedBox(height: AppSpacing.m),
             AppButton(
-              title: 'Post Item',
+              title: _loading ? 'Posting...' : 'Post Item',
               onPress: _handleSubmit,
               loading: _loading,
               type: _type == 'lost'
@@ -178,7 +271,8 @@ class _PostItemScreenState extends State<PostItemScreen> {
     return Expanded(
       child: GestureDetector(
         onTap: () => setState(() => _type = type),
-        child: Container(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(vertical: AppSpacing.s),
           decoration: BoxDecoration(
             color: isActive ? activeColor : Colors.transparent,

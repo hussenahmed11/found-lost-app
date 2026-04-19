@@ -2,24 +2,20 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import '../models/post_model.dart';
+import 'image_upload_service.dart';
 
 class PostService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
   static const String _collection = 'posts';
 
-  /// Create a new post, optionally uploading an image first.
+  /// Create a new post, optionally uploading an image first via Cloudinary.
   Future<DocumentReference> createPost(
       String userId, Map<String, dynamic> postData, String? imagePath) async {
     String? imageUrl;
 
     if (imagePath != null) {
-      final file = File(imagePath);
-      final filename = 'posts/${userId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final ref = _storage.ref(filename);
-
-      await ref.putFile(file);
-      imageUrl = await ref.getDownloadURL();
+      imageUrl = await ImageUploadService.uploadImage(imagePath);
     }
 
     final post = {
@@ -48,6 +44,26 @@ class PostService {
 
     return query.snapshots().map((snapshot) =>
         snapshot.docs.map((doc) => Post.fromFirestore(doc)).toList());
+  }
+
+  /// Stream of posts for a specific user.
+  Stream<List<Post>> getUserPosts(String userId) {
+    return _db
+        .collection(_collection)
+        .where('userId', isEqualTo: userId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => Post.fromFirestore(doc)).toList());
+  }
+
+  /// Get a single post by ID.
+  Future<Post?> getPostById(String postId) async {
+    final doc = await _db.collection(_collection).doc(postId).get();
+    if (doc.exists) {
+      return Post.fromFirestore(doc);
+    }
+    return null;
   }
 
   /// Delete a post by ID.

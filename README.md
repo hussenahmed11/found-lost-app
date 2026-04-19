@@ -1,17 +1,16 @@
-# Campus Lost & Found 📱🎓
+# Haramaya University Lost & Found App 🎓📱
 
-Welcome to the **Campus Lost & Found** app! This is a modern, cross-platform mobile application built with Flutter & Firebase. It allows students to report, track, and recover lost and found items across the campus.
-
-*Note: This project was successfully migrated from a React Native/Expo architecture to a clean, scalable Flutter architecture.*
+Welcome to the **Haramaya University Lost & Found** app! This is a modern, cross-platform mobile application built with Flutter & Firebase. It empowers students to safely report, track, and recover lost and found items across the campus.
 
 ## ✨ Features
 
-- **User Authentication:** Secure explicit email/password registration and login.
-- **Lost & Found Feed:** A unified feed to see recently posted lost and found items.
-- **Item Categorization:** Tags such as Electronics, Bags, IDs, and location tagging.
-- **Post Creation:** Add new items with image uploads using your device's camera or gallery.
-- **Real-Time Messaging:** Built-in chat system allowing finders to message owners privately.
-- **Matching Algorithm:** Behind-the-scenes logic tracking similarities to find potential matches between reported "Lost" and "Found" items.
+- **Google Student Sign-In:** Secure authentication using Google Sign-In with real-time Firebase profile syncing.
+- **5-Tab Navigation System:** A highly responsive, safe-area-aware custom bottom navigation bar that seamlessly integrates with Android system gestures.
+- **Lost & Found Feed:** A unified feed to see recently posted lost and found items in real-time using Firestore streams.
+- **Save/Bookmark System:** Users can save items and view them later in their dedicated "Saved Items" tab with swipe-to-dismiss functionality.
+- **Cloudinary Image Hosting:** Instantly upload item photos and profile pictures using a custom integration with Cloudinary (bypassing Firebase Storage limits).
+- **Interactive App Icon:** Custom interactive 'FL' smart 3D glassmorphism logo integrated into the native Android platform.
+- **Real-Time Messaging:** Built-in chat system allowing finders to message owners privately, fetching real user names and dynamic avatars.
 - **Cross-Platform:** Codebase is structured to easily compile to both Android and iOS.
 
 ---
@@ -19,11 +18,11 @@ Welcome to the **Campus Lost & Found** app! This is a modern, cross-platform mob
 ## 🛠️ Tech Stack & Architecture
 
 - **Flutter / Dart:** Core UI framework and application logic.
-- **Firebase Auth:** User authentication and session management.
-- **Cloud Firestore:** Real-time NoSQL database for posts, user profiles, active chats, and private messages.
-- **Firebase Storage:** Cloud storage for uploading pictures of items.
-- **Provider:** Robust state management (handles auth state and profile initialization).
-- **Native Routing:** Direct Material Navigation using named routes (`/login`, `/item-details`, `/chat-room`).
+- **Firebase Auth & Google Sign-In:** One-click student login and session management.
+- **Cloud Firestore:** Real-time NoSQL database for feed posts, saved item references, user profiles, and private messages.
+- **Cloudinary:** Lightning fast, unsigned image uploads for item photos and profile avatars.
+- **Provider:** Robust state management ensuring fast localized UI updates.
+- **Native Routing:** Stateful `IndexedStack` routing allowing users to switch tabs without losing reading position.
 
 ### 📂 Project Structure
 
@@ -33,16 +32,16 @@ lib/
 ├── constants/          # Application-wide themes, colors, and layout metrics
 ├── models/             # Data serialization classes (Post, Chat, Message)
 ├── navigation/         # Centralized AppRouter and bottom tab orchestrator
-├── providers/          # ChangeNotifier classes for state management
+├── providers/          # AuthProvider for reactive profile state
 ├── screens/
-│   ├── auth/           # Login and Registration flows
+│   ├── auth/           # Haramaya branded Login
 │   ├── chat/           # Chat list tracking and real-time private messaging
 │   ├── feed/           # Main item feed and post creation wizard
-│   └── profile/        # User profile, statistics, and logout
-├── services/           # Controller singletons for external API calls (Firebase)
-├── utils/              # Helper functions and business algorithms
-├── widgets/            # Reusable UI components (Buttons, Inputs, Cards)
-└── main.dart           # App entry point & Firebase initialization
+│   ├── saved/          # Swipeable saved items view
+│   └── profile/        # User profile, statistics, and editing
+├── services/           # External API calls (Firestore, Cloudinary)
+├── widgets/            # Reusable UI components
+└── main.dart           # App entry point & System UI Edge-to-Edge binding
 ```
 
 ---
@@ -60,13 +59,13 @@ Follow these steps to run the project locally.
 flutter pub get
 ```
 
-### 2. Firebase Configuration
-The Android runner uses a `google-services.json` file inside `android/app/`. If you want to configure this for iOS:
-1. Go to the [Firebase Console](https://console.firebase.google.com).
-2. Register an iOS app ensuring the bundle ID matches.
-3. Download the `GoogleService-Info.plist` and place it in the `ios/Runner/` folder via Xcode.
+### 2. Configure Images (Cloudinary)
+By default, the app uses Cloudinary for free image uploads. In `lib/services/image_upload_service.dart`, ensure your `cloudName` and `uploadPreset` are correctly defined.
 
-### 3. Run the App
+### 3. Firebase Configuration
+The Android runner uses a `google-services.json` file inside `android/app/` with the registered SHA-1 and SHA-256 fingerprints for Google Sign-In.
+
+### 4. Run the App
 Connect a physical device or run an emulator, then:
 ```bash
 flutter run
@@ -76,7 +75,8 @@ flutter run
 
 ## 📝 Design Philosophy
 
-We prioritized a **vibrant, highly accessible UI**, replacing generic browser-default colors with an attractive theme map: 
+We prioritized a **vibrant, highly accessible premium UI**, replacing generic browser-default colors with an attractive Haramaya University theme map:
+- **Navigation:** Native Android system buttons are styled beautifully and pushed behind a clean App background.
 - **Lost Items** are highlighted with a distinct Red (`#FF3B30`).
 - **Found Items** are highlighted with a calming Green (`#34C759`).
 - Standard UI actions follow a strong guiding Blue primary color (`#007AFF`).

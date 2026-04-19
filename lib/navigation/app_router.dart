@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../constants/theme.dart';
 import '../providers/auth_provider.dart';
@@ -8,6 +9,7 @@ import '../screens/auth/register_screen.dart';
 import '../screens/feed/feed_screen.dart';
 import '../screens/feed/post_item_screen.dart';
 import '../screens/feed/item_details_screen.dart';
+import '../screens/saved/saved_screen.dart';
 import '../screens/chat/chat_list_screen.dart';
 import '../screens/chat/chat_room_screen.dart';
 import '../screens/profile/profile_screen.dart';
@@ -21,17 +23,30 @@ class AppRouter extends StatelessWidget {
     final authProvider = context.watch<AuthProvider>();
 
     if (authProvider.loading) {
-      return const MaterialApp(
+      return MaterialApp(
+        debugShowCheckedModeBanner: false,
         home: Scaffold(
+          backgroundColor: AppColors.background,
           body: Center(
-            child: CircularProgressIndicator(color: AppColors.primary),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  'assets/images/haramaya_logo.png',
+                  width: 100,
+                  height: 100,
+                ),
+                const SizedBox(height: 24),
+                const CircularProgressIndicator(color: AppColors.primary),
+              ],
+            ),
           ),
         ),
       );
     }
 
     return MaterialApp(
-      title: 'Campus Lost & Found',
+      title: 'Haramaya University Lost & Found',
       theme: buildAppTheme(),
       debugShowCheckedModeBanner: false,
       home: authProvider.isLoggedIn
@@ -61,7 +76,7 @@ class AppRouter extends StatelessWidget {
   }
 }
 
-/// Bottom navigation shell with 5 tabs matching the React Native TabNavigator.
+/// Bottom navigation shell with 5 tabs.
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
@@ -72,21 +87,21 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = const [
-    FeedScreen(),
-    FeedScreen(), // Saved – reuses Feed (same as RN version)
-    PostItemScreen(),
-    ChatListScreen(),
-    ProfileScreen(),
-  ];
-
   final List<String> _titles = const [
-    'Campus Lost & Found',
-    'Saved',
-    'Add New Post',
+    'Haramaya Lost & Found',
+    'Saved Items',
+    'Create Post',
     'Messages',
     'Profile',
   ];
+
+  void _onTabTapped(int index) {
+    setState(() => _currentIndex = index);
+  }
+
+  void _switchToFeed() {
+    setState(() => _currentIndex = 0);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -107,51 +122,70 @@ class _MainShellState extends State<MainShell> {
       ),
       body: IndexedStack(
         index: _currentIndex,
-        children: _screens,
+        children: [
+          const FeedScreen(),
+          const SavedScreen(),
+          PostItemScreen(onPostSuccess: _switchToFeed),
+          const ChatListScreen(),
+          const ProfileScreen(),
+        ],
       ),
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          border: Border(
-            top: BorderSide(color: AppColors.border),
+      // Use Flutter's built-in BottomNavigationBar — it handles safe area automatically
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: _onTabTapped,
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: AppColors.surface,
+        selectedItemColor: AppColors.primary,
+        unselectedItemColor: AppColors.textSecondary,
+        selectedFontSize: 12,
+        unselectedFontSize: 12,
+        elevation: 8,
+        items: [
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.home_outlined),
+            activeIcon: Icon(Icons.home),
+            label: 'Feed',
           ),
-        ),
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: (index) => setState(() => _currentIndex = index),
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: AppColors.surface,
-          selectedItemColor: AppColors.primary,
-          unselectedItemColor: AppColors.textSecondary,
-          selectedFontSize: 12,
-          unselectedFontSize: 12,
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home),
-              label: 'Feed',
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.bookmark_outline),
+            activeIcon: Icon(Icons.bookmark),
+            label: 'Saved',
+          ),
+          BottomNavigationBarItem(
+            icon: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [AppColors.primary, Color(0xFF5856D6)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.3),
+                    offset: const Offset(0, 3),
+                    blurRadius: 6,
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.add, color: Colors.white, size: 26),
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.bookmark_outline),
-              activeIcon: Icon(Icons.bookmark),
-              label: 'Saved',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.add_circle_outline, size: 32),
-              activeIcon: Icon(Icons.add_circle, size: 32),
-              label: 'Post',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.chat_bubble_outline),
-              activeIcon: Icon(Icons.chat_bubble),
-              label: 'Chats',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
-              activeIcon: Icon(Icons.person),
-              label: 'Profile',
-            ),
-          ],
-        ),
+            label: '',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.chat_bubble_outline),
+            activeIcon: Icon(Icons.chat_bubble),
+            label: 'Chats',
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            activeIcon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+        ],
       ),
     );
   }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../constants/theme.dart';
 import '../../models/chat_model.dart';
 import '../../providers/auth_provider.dart';
@@ -14,6 +15,22 @@ class ChatListScreen extends StatefulWidget {
 
 class _ChatListScreenState extends State<ChatListScreen> {
   final ChatService _chatService = ChatService();
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
+
+  // Cache user profiles to avoid repeated fetches
+  final Map<String, Map<String, dynamic>> _userCache = {};
+
+  Future<Map<String, dynamic>?> _getUserProfile(String uid) async {
+    if (_userCache.containsKey(uid)) return _userCache[uid];
+    try {
+      final doc = await _db.collection('users').doc(uid).get();
+      if (doc.exists) {
+        _userCache[uid] = doc.data()!;
+        return _userCache[uid];
+      }
+    } catch (_) {}
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,15 +57,34 @@ class _ChatListScreenState extends State<ChatListScreen> {
           final chats = snapshot.data ?? [];
 
           if (chats.isEmpty) {
-            return const Center(
+            return Center(
               child: Padding(
-                padding: EdgeInsets.all(AppSpacing.xl),
-                child: Text(
-                  'No conversations yet',
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 16,
-                  ),
+                padding: const EdgeInsets.all(AppSpacing.xl),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.chat_bubble_outline,
+                        size: 64,
+                        color: AppColors.textSecondary.withValues(alpha: 0.5)),
+                    const SizedBox(height: AppSpacing.m),
+                    const Text(
+                      'No conversations yet',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.s),
+                    const Text(
+                      'Contact a poster from the Feed to start chatting.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             );
@@ -62,7 +98,17 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   chat.participants.firstWhere((id) => id != user.uid,
                       orElse: () => 'Unknown');
 
-              return _buildChatItem(chat, otherUserId);
+              return FutureBuilder<Map<String, dynamic>?>(
+                future: _getUserProfile(otherUserId),
+                builder: (context, profileSnapshot) {
+                  final profile = profileSnapshot.data;
+                  final displayName = profile?['name'] ?? 'User';
+                  final profileImage = profile?['profileImage'];
+
+                  return _buildChatItem(
+                      chat, otherUserId, displayName, profileImage);
+                },
+              );
             },
           );
         },
@@ -70,7 +116,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
     );
   }
 
-  Widget _buildChatItem(Chat chat, String otherUserId) {
+  Widget _buildChatItem(Chat chat, String otherUserId, String displayName,
+      String? profileImage) {
     return InkWell(
       onTap: () {
         Navigator.of(context).pushNamed(
@@ -86,7 +133,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
         decoration: const BoxDecoration(
           color: AppColors.surface,
           border: Border(
-            bottom: BorderSide(color: AppColors.border),
+            bottom: BorderSide(color: AppColors.border, width: 0.5),
           ),
         ),
         child: Row(
@@ -99,8 +146,21 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 color: AppColors.background,
                 borderRadius: BorderRadius.circular(AppRadius.round),
               ),
-              child: const Icon(Icons.person,
-                  color: AppColors.textSecondary, size: 24),
+              child: profileImage != null
+                  ? ClipRRect(
+                      borderRadius:
+                          BorderRadius.circular(AppRadius.round),
+                      child: Image.network(
+                        profileImage,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Icon(
+                            Icons.person,
+                            color: AppColors.textSecondary,
+                            size: 24),
+                      ),
+                    )
+                  : const Icon(Icons.person,
+                      color: AppColors.textSecondary, size: 24),
             ),
             const SizedBox(width: AppSpacing.m),
 
@@ -112,17 +172,22 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'User ${otherUserId.substring(0, otherUserId.length >= 5 ? 5 : otherUserId.length)}',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
+                      Expanded(
+                        child: Text(
+                          displayName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
                         ),
                       ),
                       if (chat.updatedAt != null)
                         Text(
-                          TimeOfDay.fromDateTime(chat.updatedAt!).format(context),
+                          TimeOfDay.fromDateTime(chat.updatedAt!)
+                              .format(context),
                           style: const TextStyle(
                             fontSize: 12,
                             color: AppColors.textSecondary,
