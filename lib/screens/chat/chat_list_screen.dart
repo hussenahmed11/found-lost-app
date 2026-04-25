@@ -116,104 +116,103 @@ class _ChatListScreenState extends State<ChatListScreen> {
     );
   }
 
-  Widget _buildChatItem(Chat chat, String otherUserId, String displayName,
-      String? profileImage) {
-    return InkWell(
-      onTap: () {
-        Navigator.of(context).pushNamed(
-          '/chat-room',
-          arguments: {
-            'chatId': chat.id,
-            'otherUserId': otherUserId,
-          },
-        );
+  Widget _buildChatItem(Chat chat, String otherUserId) {
+    return Dismissible(
+      key: Key(chat.id),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        color: AppColors.danger,
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: AppSpacing.l),
+        child: const Icon(Icons.delete, color: Colors.white),
+      ),
+      onDismissed: (direction) async {
+        await _chatService.deleteChat(chat.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Chat deleted')),
+          );
+        }
       },
-      child: Container(
-        padding: const EdgeInsets.all(AppSpacing.m),
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          border: Border(
-            bottom: BorderSide(color: AppColors.border, width: 0.5),
-          ),
-        ),
-        child: Row(
-          children: [
-            // Avatar
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: AppColors.background,
-                borderRadius: BorderRadius.circular(AppRadius.round),
-              ),
-              child: profileImage != null
-                  ? ClipRRect(
-                      borderRadius:
-                          BorderRadius.circular(AppRadius.round),
-                      child: Image.network(
-                        profileImage,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Icon(
-                            Icons.person,
-                            color: AppColors.textSecondary,
-                            size: 24),
-                      ),
-                    )
-                  : const Icon(Icons.person,
-                      color: AppColors.textSecondary, size: 24),
+      child: InkWell(
+        onTap: () {
+          Navigator.of(context).pushNamed(
+            '/chat-room',
+            arguments: {
+              'chatId': chat.id,
+              'otherUserId': otherUserId,
+            },
+          );
+        },
+        child: Container(
+          padding: const EdgeInsets.all(AppSpacing.m),
+          decoration: const BoxDecoration(
+            color: AppColors.surface,
+            border: Border(
+              bottom: BorderSide(color: AppColors.border),
             ),
-            const SizedBox(width: AppSpacing.m),
+          ),
+          child: Row(
+            children: [
+              // Avatar
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(AppRadius.round),
+                ),
+                child: const Icon(Icons.person,
+                    color: AppColors.textSecondary, size: 24),
+              ),
+              const SizedBox(width: AppSpacing.m),
 
-            // Content
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          displayName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+              // Content
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'User ${otherUserId.substring(0, otherUserId.length >= 5 ? 5 : otherUserId.length)}',
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
                             color: AppColors.textPrimary,
                           ),
                         ),
-                      ),
-                      if (chat.updatedAt != null)
-                        Text(
-                          TimeOfDay.fromDateTime(chat.updatedAt!)
-                              .format(context),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
+                        if (chat.updatedAt != null)
+                          Text(
+                            TimeOfDay.fromDateTime(chat.updatedAt!).format(context),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
                           ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    chat.lastMessage.isNotEmpty
-                        ? chat.lastMessage
-                        : 'No messages yet',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textSecondary,
+                      ],
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 4),
+                    Text(
+                      chat.lastMessage.isNotEmpty
+                          ? chat.lastMessage
+                          : 'No messages yet',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
 
-            const Icon(Icons.chevron_right,
-                size: 20, color: AppColors.border),
-          ],
+              const Icon(Icons.chevron_right,
+                  size: 20, color: AppColors.border),
+            ],
+          ),
         ),
       ),
     );

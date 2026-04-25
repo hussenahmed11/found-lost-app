@@ -57,7 +57,7 @@ class AppInput extends StatelessWidget {
               ),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.shadow.withValues(alpha: 0.05),
+                  color: AppColors.shadow.withOpacity(0.05),
                   offset: const Offset(0, 1),
                   blurRadius: 2,
                 ),

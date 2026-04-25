@@ -268,7 +268,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               style: TextStyle(
                 fontSize: 10,
                 color: isMine
-                    ? Colors.white.withValues(alpha: 0.7)
+                    ? Colors.white.withOpacity(0.7)
                     : AppColors.textSecondary,
               ),
             ),

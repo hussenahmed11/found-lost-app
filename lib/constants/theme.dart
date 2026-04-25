@@ -36,7 +36,7 @@ class AppRadius {
 class AppShadows {
   static List<BoxShadow> light = [
     BoxShadow(
-      color: AppColors.shadow.withValues(alpha: 0.05),
+      color: AppColors.shadow.withOpacity(0.05),
       offset: const Offset(0, 2),
       blurRadius: 8,
     ),
@@ -44,7 +44,7 @@ class AppShadows {
 
   static List<BoxShadow> medium = [
     BoxShadow(
-      color: AppColors.shadow.withValues(alpha: 0.1),
+      color: AppColors.shadow.withOpacity(0.1),
       offset: const Offset(0, 4),
       blurRadius: 12,
     ),

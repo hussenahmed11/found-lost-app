@@ -75,4 +75,18 @@ class ChatService {
         .map((snapshot) =>
             snapshot.docs.map((doc) => Chat.fromFirestore(doc)).toList());
   }
+
+  /// Delete a chat history.
+  Future<void> deleteChat(String chatId) async {
+    final chatRef = _db.collection(_chatsCollection).doc(chatId);
+    
+    // Delete all messages in the subcollection
+    final messages = await chatRef.collection(_messagesCollection).get();
+    for (var doc in messages.docs) {
+      await doc.reference.delete();
+    }
+    
+    // Delete the chat document
+    await chatRef.delete();
+  }
 }

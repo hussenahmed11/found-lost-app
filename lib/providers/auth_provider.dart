@@ -58,19 +58,8 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Update user profile data in Firestore and refresh local cache.
-  Future<void> updateProfile(Map<String, dynamic> data) async {
-    if (_user == null) return;
-    await _db.collection('users').doc(_user!.uid).update(data);
-    _profile = {...?_profile, ...data};
-    notifyListeners();
-  }
-
-  /// Refresh profile from Firestore.
-  Future<void> refreshProfile() async {
-    if (_user == null) return;
-    _profile = await _authService.getUserProfile(_user!.uid);
-    notifyListeners();
+  Future<void> signInWithGoogle() async {
+    await _authService.signInWithGoogle();
   }
 
   Future<void> logout() async {

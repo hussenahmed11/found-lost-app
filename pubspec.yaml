@@ -4,7 +4,7 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.5.0 <4.0.0'
+  sdk: ^3.5.0
 
 dependencies:
   flutter:
@@ -17,6 +17,7 @@ dependencies:
   firebase_auth: ^5.5.2
   cloud_firestore: ^5.6.6
   firebase_storage: ^12.4.4
+  google_sign_in: ^6.2.2
 
   # State Management
   provider: ^6.1.2
@@ -41,14 +42,13 @@ dev_dependencies:
   flutter_lints: ^4.0.0
   flutter_launcher_icons: ^0.13.1
 
+flutter_launcher_icons:
+  android: "ic_launcher"
+  ios: true
+  image_path: "assets/app_icon.png"
+  min_sdk_android: 21
+
 flutter:
   uses-material-design: true
   assets:
-    - assets/images/haramaya_logo.png
-    - assets/images/app_icon.png
-
-flutter_launcher_icons:
-  android: true
-  ios: true
-  image_path: "assets/images/app_icon.png"
-  min_sdk_android: 21
+    - assets/

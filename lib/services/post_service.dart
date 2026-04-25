@@ -31,19 +31,20 @@ class PostService {
 
   /// Stream of posts with optional filters.
   Stream<List<Post>> getPosts({String? type, String? category}) {
-    Query query = _db.collection(_collection);
+    Query query = _db.collection(_collection).orderBy('createdAt', descending: true);
 
-    if (type != null) {
-      query = query.where('type', isEqualTo: type);
-    }
-    if (category != null) {
-      query = query.where('category', isEqualTo: category);
-    }
-
-    query = query.orderBy('createdAt', descending: true);
-
-    return query.snapshots().map((snapshot) =>
-        snapshot.docs.map((doc) => Post.fromFirestore(doc)).toList());
+    return query.snapshots().map((snapshot) {
+      var posts = snapshot.docs.map((doc) => Post.fromFirestore(doc)).toList();
+      
+      if (type != null && type.toLowerCase() != 'all') {
+        posts = posts.where((p) => p.type.toLowerCase() == type.toLowerCase()).toList();
+      }
+      if (category != null && category.toLowerCase() != 'all') {
+        posts = posts.where((p) => p.category == category).toList();
+      }
+      
+      return posts;
+    });
   }
 
   /// Stream of posts for a specific user.

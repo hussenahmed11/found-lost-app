@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import '../../constants/theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/app_input.dart';
@@ -48,7 +49,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
     try {
       await context.read<AuthProvider>().register(email, password, name);
     } catch (error) {
-      if (mounted) _showError(error.toString());
+      if (mounted) {
+        String errorMsg = error.toString();
+        if (errorMsg.contains('SocketException') || errorMsg.contains('Failed host lookup') || errorMsg.contains('network_error')) {
+          errorMsg = 'Connection failed. Please check your internet and try again.';
+        } else if (error is FirebaseAuthException) {
+          errorMsg = error.message ?? 'Registration failed';
+        }
+        _showError(errorMsg);
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }

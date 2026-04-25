@@ -28,7 +28,7 @@ class PostCard extends StatelessWidget {
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.l),
         elevation: 4,
-        shadowColor: AppColors.shadow.withValues(alpha: 0.1),
+        shadowColor: AppColors.shadow.withOpacity(0.1),
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(AppRadius.l),
@@ -49,8 +49,7 @@ class PostCard extends StatelessWidget {
                         ? Image.network(
                             post.imageUrl!,
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                Container(
+                            errorBuilder: (_, __, a) => Container(
                               color: AppColors.border,
                               child: const Icon(Icons.image,
                                   color: AppColors.textSecondary),

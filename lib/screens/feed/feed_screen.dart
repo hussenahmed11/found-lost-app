@@ -6,6 +6,7 @@ import '../../providers/auth_provider.dart';
 import '../../services/post_service.dart';
 import '../../services/saved_posts_service.dart';
 import '../../widgets/post_card.dart';
+import '../../services/post_service.dart';
 
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
@@ -16,8 +17,7 @@ class FeedScreen extends StatefulWidget {
 
 class _FeedScreenState extends State<FeedScreen> {
   final PostService _postService = PostService();
-  final SavedPostsService _savedService = SavedPostsService();
-  String? _filterType; // null = all, 'lost', 'found'
+  String _selectedType = 'all';
 
   @override
   Widget build(BuildContext context) {
@@ -27,97 +27,49 @@ class _FeedScreenState extends State<FeedScreen> {
       backgroundColor: AppColors.background,
       body: Column(
         children: [
-          // Filter chips
           Padding(
-            padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.m, vertical: AppSpacing.s),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.m, vertical: AppSpacing.s),
             child: Row(
               children: [
-                _buildFilterChip('All', null),
-                const SizedBox(width: 8),
-                _buildFilterChip('Lost', 'lost'),
-                const SizedBox(width: 8),
-                _buildFilterChip('Found', 'found'),
+                _buildFilterButton('All', 'all'),
+                const SizedBox(width: AppSpacing.s),
+                _buildFilterButton('Lost', 'lost'),
+                const SizedBox(width: AppSpacing.s),
+                _buildFilterButton('Found', 'found'),
               ],
             ),
           ),
-          // Posts list
           Expanded(
             child: StreamBuilder<List<Post>>(
-              stream: _postService.getPosts(type: _filterType),
+              stream: _postService.getPosts(type: _selectedType),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(
-                    child: CircularProgressIndicator(color: AppColors.primary),
-                  );
+                  return const Center(child: CircularProgressIndicator(color: AppColors.primary));
                 }
-
                 if (snapshot.hasError) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppSpacing.xl),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.error_outline,
-                              size: 48, color: AppColors.danger),
-                          const SizedBox(height: AppSpacing.m),
-                          Text(
-                            'Error loading posts:\n${snapshot.error}',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
+                  return Center(child: Text('Error: ${snapshot.error}', style: const TextStyle(color: AppColors.danger)));
                 }
-
+                
                 final posts = snapshot.data ?? [];
-
                 if (posts.isEmpty) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppSpacing.xl),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.search_off,
-                              size: 64,
-                              color: AppColors.textSecondary.withValues(alpha: 0.5)),
-                          const SizedBox(height: AppSpacing.m),
-                          const Text(
-                            'No posts yet',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.s),
-                          const Text(
-                            'Be the first to report a lost or found item!',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
+                  return const Center(child: Text('No items found.', style: TextStyle(color: AppColors.textSecondary)));
                 }
 
-                return RefreshIndicator(
-                  color: AppColors.primary,
-                  onRefresh: () async {
-                    // StreamBuilder auto-refreshes, but we add a small delay for UX
-                    await Future.delayed(const Duration(milliseconds: 500));
+                return ListView.builder(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.xl),
+                  itemCount: posts.length,
+                  itemBuilder: (context, index) {
+                    final post = posts[index];
+                    return PostCard(
+                      post: post,
+                      onTap: () {
+                        Navigator.of(context).pushNamed(
+                          '/item-details',
+                          arguments: post,
+                        );
+                      },
+                    );
                   },
-                  child: _buildPostsList(posts, user?.uid),
                 );
               },
             ),
@@ -127,66 +79,27 @@ class _FeedScreenState extends State<FeedScreen> {
     );
   }
 
-  Widget _buildPostsList(List<Post> posts, String? currentUserId) {
-    if (currentUserId == null) {
-      return ListView.builder(
-        padding: const EdgeInsets.only(bottom: AppSpacing.xl),
-        itemCount: posts.length,
-        itemBuilder: (context, index) {
-          return PostCard(
-            post: posts[index],
-            onTap: () => _navigateToDetails(posts[index]),
-          );
-        },
-      );
-    }
-
-    return StreamBuilder<List<String>>(
-      stream: _savedService.getSavedPostIds(currentUserId),
-      builder: (context, savedSnapshot) {
-        final savedIds = savedSnapshot.data ?? [];
-
-        return ListView.builder(
-          padding: const EdgeInsets.only(bottom: AppSpacing.xl),
-          itemCount: posts.length,
-          itemBuilder: (context, index) {
-            final post = posts[index];
-            return PostCard(
-              post: post,
-              isSaved: savedIds.contains(post.id),
-              onTap: () => _navigateToDetails(post),
-              onSave: () => _savedService.toggleSaved(currentUserId, post.id),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  void _navigateToDetails(Post post) {
-    Navigator.of(context).pushNamed('/item-details', arguments: post);
-  }
-
-  Widget _buildFilterChip(String label, String? type) {
-    final isActive = _filterType == type;
-    return GestureDetector(
-      onTap: () => setState(() => _filterType = type),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isActive ? AppColors.primary : AppColors.surface,
-          borderRadius: BorderRadius.circular(AppRadius.round),
-          border: Border.all(
-            color: isActive ? AppColors.primary : AppColors.border,
+  Widget _buildFilterButton(String label, String type) {
+    final isSelected = _selectedType == type;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _selectedType = type),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.primary : AppColors.surface,
+            borderRadius: BorderRadius.circular(AppRadius.round),
+            border: Border.all(
+              color: isSelected ? AppColors.primary : AppColors.border,
+            ),
           ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: isActive ? Colors.white : AppColors.textSecondary,
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? Colors.white : AppColors.textPrimary,
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            ),
           ),
         ),
       ),

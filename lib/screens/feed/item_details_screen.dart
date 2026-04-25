@@ -8,94 +8,40 @@ import '../../providers/auth_provider.dart';
 import '../../services/chat_service.dart';
 import '../../services/saved_posts_service.dart';
 import '../../widgets/app_button.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../services/chat_service.dart';
+import '../../providers/auth_provider.dart';
 
 class ItemDetailsScreen extends StatefulWidget {
   final Post post;
 
   const ItemDetailsScreen({super.key, required this.post});
 
-  @override
-  State<ItemDetailsScreen> createState() => _ItemDetailsScreenState();
-}
-
-class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
-  final ChatService _chatService = ChatService();
-  final SavedPostsService _savedService = SavedPostsService();
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
-  bool _isSaved = false;
-  bool _contactLoading = false;
-  Map<String, dynamic>? _posterProfile;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadPosterProfile();
-    _checkIfSaved();
-  }
-
-  Future<void> _loadPosterProfile() async {
-    try {
-      final doc =
-          await _db.collection('users').doc(widget.post.userId).get();
-      if (doc.exists && mounted) {
-        setState(() => _posterProfile = doc.data());
-      }
-    } catch (_) {}
-  }
-
-  Future<void> _checkIfSaved() async {
-    final user = context.read<AuthProvider>().user;
-    if (user == null) return;
-    final saved = await _savedService.isSaved(user.uid, widget.post.id);
-    if (mounted) setState(() => _isSaved = saved);
-  }
-
-  Future<void> _handleContact() async {
-    final user = context.read<AuthProvider>().user;
-    if (user == null) return;
-
-    // Don't let user chat with themselves
-    if (user.uid == widget.post.userId) {
+  void _handleContact(BuildContext context) async {
+    final currentUserId = Provider.of<AuthProvider>(context, listen: false).user?.uid;
+    if (currentUserId == null) return;
+    
+    if (currentUserId == post.userId) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('This is your own post.'),
-          behavior: SnackBarBehavior.floating,
-        ),
+        const SnackBar(content: Text('You cannot chat with yourself.')),
       );
       return;
     }
 
-    setState(() => _contactLoading = true);
     try {
-      final chatId =
-          await _chatService.createOrGetChat(user.uid, widget.post.userId);
-      if (mounted) {
-        Navigator.of(context).pushNamed('/chat-room', arguments: {
-          'chatId': chatId,
-          'otherUserId': widget.post.userId,
-        });
-      }
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error starting chat: $error'),
-            backgroundColor: AppColors.danger,
-            behavior: SnackBarBehavior.floating,
-          ),
+      final chatId = await ChatService().createOrGetChat(currentUserId, post.userId);
+      if (context.mounted) {
+        Navigator.of(context).pushNamed(
+          '/chat-room',
+          arguments: {'chatId': chatId, 'otherUserId': post.userId},
         );
       }
-    } finally {
-      if (mounted) setState(() => _contactLoading = false);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to start chat: $e')),
+        );
+      }
     }
-  }
-
-  Future<void> _toggleSave() async {
-    final user = context.read<AuthProvider>().user;
-    if (user == null) return;
-    await _savedService.toggleSaved(user.uid, widget.post.id);
-    if (mounted) setState(() => _isSaved = !_isSaved);
   }
 
   void _handleShare() {
@@ -130,13 +76,11 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
                           child: widget.post.imageUrl != null
                               ? Image.network(widget.post.imageUrl!,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) =>
-                                      Container(
-                                          color: AppColors.border,
-                                          child: const Icon(Icons.image,
-                                              size: 60,
-                                              color:
-                                                  AppColors.textSecondary)))
+                                  errorBuilder: (_, __, a) => Container(
+                                      color: AppColors.border,
+                                      child: const Icon(Icons.image,
+                                          size: 60,
+                                          color: AppColors.textSecondary)))
                               : Container(
                                   color: AppColors.border,
                                   child: const Icon(Icons.image,
@@ -275,7 +219,7 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
                             padding: const EdgeInsets.symmetric(
                                 vertical: AppSpacing.l),
                             child: Divider(
-                                color: AppColors.border.withValues(alpha: 0.5),
+                                color: AppColors.border.withOpacity(0.5),
                                 height: 1),
                           ),
 
@@ -305,7 +249,7 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
                             padding: const EdgeInsets.symmetric(
                                 vertical: AppSpacing.l),
                             child: Divider(
-                                color: AppColors.border.withValues(alpha: 0.5),
+                                color: AppColors.border.withOpacity(0.5),
                                 height: 1),
                           ),
 
@@ -422,7 +366,7 @@ class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
       child: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.85),
+          color: Colors.white.withOpacity(0.8),
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(

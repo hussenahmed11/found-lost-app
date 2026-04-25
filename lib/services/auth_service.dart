@@ -77,6 +77,41 @@ class AuthService {
     return null;
   }
 
+  /// Sign in with Google.
+  Future<UserCredential?> signInWithGoogle() async {
+    final GoogleSignIn googleSignIn = GoogleSignIn();
+
+    final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+    if (googleUser == null) {
+      return null; // User canceled
+    }
+
+    final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+    final AuthCredential credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
+    );
+
+    final UserCredential userCredential = await _auth.signInWithCredential(credential);
+    final User? user = userCredential.user;
+
+    if (user != null) {
+      final doc = await _db.collection('users').doc(user.uid).get();
+      if (!doc.exists) {
+        final profileData = {
+          'uid': user.uid,
+          'name': user.displayName ?? 'Unknown',
+          'email': user.email ?? '',
+          'createdAt': DateTime.now().toIso8601String(),
+          'profileImage': user.photoURL,
+          'role': 'student',
+        };
+        await _db.collection('users').doc(user.uid).set(profileData);
+      }
+    }
+    return userCredential;
+  }
+
   /// Sign out.
   Future<void> logout() => _auth.signOut();
 }
