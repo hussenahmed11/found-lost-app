@@ -48,7 +48,7 @@ class _SavedScreenState extends State<SavedScreen> {
                   children: [
                     Icon(Icons.bookmark_outline,
                         size: 64,
-                        color: AppColors.textSecondary.withValues(alpha: 0.5)),
+                        color: AppColors.textSecondary.withOpacity(0.5)),
                     const SizedBox(height: AppSpacing.m),
                     const Text(
                       'No saved items',

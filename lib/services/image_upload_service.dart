@@ -5,15 +5,7 @@ import 'package:http/http.dart' as http;
 /// Service to handle uploading images to Cloudinary (Free Image Hosting)
 /// This bypasses Firebase Storage completely!
 class ImageUploadService {
-  // ---------------------------------------------------------
-  // TODO: Add your Cloudinary details here to enable image uploads!
-  // 1. Go to https://cloudinary.com/ and create a free account.
-  // 2. Find your "Cloud Name" on the dashboard and paste it below.
-  // 3. Go to Settings (gear icon) -> Upload. Scroll down to "Upload presets".
-  // 4. Click "Add upload preset". Set "Signing Mode" to "Unsigned".
-  // 5. Copy the preset name and paste it below. Save the preset on Cloudinary.
-  // ---------------------------------------------------------
-
+  // Cloudinary configuration (unsigned upload preset)
   static const String cloudName = 'dpvj4h8fc';
   static const String uploadPreset = 'jskg8xnn';
 

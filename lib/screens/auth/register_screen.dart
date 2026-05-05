@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import '../../constants/theme.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/network_helper.dart';
 import '../../widgets/app_input.dart';
 import '../../widgets/app_button.dart';
 
@@ -40,23 +40,38 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
+    if (!email.contains('@') || !email.contains('.')) {
+      _showError('Please enter a valid email address');
+      return;
+    }
+
+    if (password.length < 6) {
+      _showError('Password must be at least 6 characters');
+      return;
+    }
+
     if (password != confirmPassword) {
       _showError('Passwords do not match');
       return;
     }
 
+    final authProvider = context.read<AuthProvider>();
     setState(() => _loading = true);
+
+    // Check connectivity first
+    final hasInternet = await NetworkHelper.hasInternetConnection();
+    if (!hasInternet && mounted) {
+      setState(() => _loading = false);
+      final shouldRetry = await NetworkHelper.showNoInternetDialog(context);
+      if (shouldRetry) return _handleRegister();
+      return;
+    }
+
     try {
-      await context.read<AuthProvider>().register(email, password, name);
+      await authProvider.register(email, password, name);
     } catch (error) {
       if (mounted) {
-        String errorMsg = error.toString();
-        if (errorMsg.contains('SocketException') || errorMsg.contains('Failed host lookup') || errorMsg.contains('network_error')) {
-          errorMsg = 'Connection failed. Please check your internet and try again.';
-        } else if (error is FirebaseAuthException) {
-          errorMsg = error.message ?? 'Registration failed';
-        }
-        _showError(errorMsg);
+        NetworkHelper.showErrorSnackbar(context, error);
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -64,13 +79,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _handleGoogleSignIn() async {
+    final authProvider = context.read<AuthProvider>();
     setState(() => _loading = true);
+
+    // Check connectivity first
+    final hasInternet = await NetworkHelper.hasInternetConnection();
+    if (!hasInternet && mounted) {
+      setState(() => _loading = false);
+      final shouldRetry = await NetworkHelper.showNoInternetDialog(context);
+      if (shouldRetry) return _handleGoogleSignIn();
+      return;
+    }
+
     try {
-      await context.read<AuthProvider>().signInWithGoogle();
-      // If sign in is successful and user profile is created, we can navigate back or to home.
-      // Usually auth state changes will handle navigation via wrapper or router.
+      await authProvider.signInWithGoogle();
     } catch (error) {
-      if (mounted) _showError(error.toString());
+      if (mounted) {
+        NetworkHelper.showErrorSnackbar(context, error);
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -79,9 +105,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white, size: 20),
+            const SizedBox(width: 8),
+            Expanded(child: Text(message)),
+          ],
+        ),
         backgroundColor: AppColors.danger,
         behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
@@ -163,9 +196,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       side: const BorderSide(color: AppColors.primary),
                     ),
-                    icon: Image.network(
-                      'https://developers.google.com/identity/images/g-logo.png',
+                    icon: Image.asset(
+                      'assets/google_logo.png',
                       height: 24,
+                      errorBuilder: (_, __, ___) => const Icon(
+                        Icons.g_mobiledata,
+                        size: 24,
+                        color: AppColors.primary,
+                      ),
                     ),
                     label: const Text(
                       'Sign in with Google',

@@ -1,84 +1,177 @@
-# Haramaya University Lost & Found App 🎓📱
+# 🎓 Haramaya University Lost & Found App
 
-Welcome to the **Haramaya University Lost & Found** app! This is a modern, cross-platform mobile application built with Flutter & Firebase. It empowers students to safely report, track, and recover lost and found items across the campus.
-
-## ✨ Features
-
-- **Google Student Sign-In:** Secure authentication using Google Sign-In with real-time Firebase profile syncing.
-- **5-Tab Navigation System:** A highly responsive, safe-area-aware custom bottom navigation bar that seamlessly integrates with Android system gestures.
-- **Lost & Found Feed:** A unified feed to see recently posted lost and found items in real-time using Firestore streams.
-- **Save/Bookmark System:** Users can save items and view them later in their dedicated "Saved Items" tab with swipe-to-dismiss functionality.
-- **Cloudinary Image Hosting:** Instantly upload item photos and profile pictures using a custom integration with Cloudinary (bypassing Firebase Storage limits).
-- **Interactive App Icon:** Custom interactive 'FL' smart 3D glassmorphism logo integrated into the native Android platform.
-- **Real-Time Messaging:** Built-in chat system allowing finders to message owners privately, fetching real user names and dynamic avatars.
-- **Cross-Platform:** Codebase is structured to easily compile to both Android and iOS.
+A modern, cross-platform mobile application built with **Flutter & Firebase** that helps Haramaya University students report, track, and recover lost and found items across the campus.
 
 ---
 
-## 🛠️ Tech Stack & Architecture
+## ✨ Features
 
-- **Flutter / Dart:** Core UI framework and application logic.
-- **Firebase Auth & Google Sign-In:** One-click student login and session management.
-- **Cloud Firestore:** Real-time NoSQL database for feed posts, saved item references, user profiles, and private messages.
-- **Cloudinary:** Lightning fast, unsigned image uploads for item photos and profile avatars.
-- **Provider:** Robust state management ensuring fast localized UI updates.
-- **Native Routing:** Stateful `IndexedStack` routing allowing users to switch tabs without losing reading position.
+### 🔐 Authentication
+- **Google Sign-In** with mandatory account chooser (no auto-login to wrong account)
+- **Email/Password** registration and login
+- Persistent session with automatic profile syncing from Firestore
+- Proper sign-out that clears cached Google sessions
 
-### 📂 Project Structure
+### 📋 Feed & Discovery
+- **Real-time feed** of all lost and found items using Firestore streams
+- **Filter buttons** — All, Lost, Found — with client-side filtering (no Firestore index required)
+- **Search bar** — search by title, location, category, or description
+- Items ordered by most recent first
 
-```text
+### 💬 Chat System
+- **Real-time messaging** between users via Firestore `onSnapshot` listeners
+- Auto-creates chat room when contacting a post owner
+- Chat list shows **real user names** and **profile images**
+- **Swipe to delete** chats with confirmation dialog
+- Messages appear instantly — no refresh needed
+
+### 📌 Save & Bookmark
+- Save/unsave items from the feed
+- Dedicated **Saved Items** tab with swipe-to-remove
+- Persistent across sessions via Firestore subcollection
+
+### 👤 Profile
+- View your profile with name, email, and profile image
+- **Edit Profile** screen to update name and photo
+- View your own posted items
+- Logout with full session cleanup
+
+### 🖼️ Image Uploads
+- **Cloudinary** integration for free, fast image hosting
+- Unsigned upload preset — no server-side auth needed
+- Supports item photos and profile pictures
+- Bypasses Firebase Storage entirely
+
+### 📱 Android Enhancements
+- **Immersive fullscreen mode** — hides status bar and navigation buttons
+- Auto-restores immersive mode when app resumes from background
+- **Adaptive app icon** with proper foreground/background layers
+- Supports display cutout (notch) devices
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer | Technology |
+|---|---|
+| **Framework** | Flutter / Dart |
+| **Auth** | Firebase Auth + Google Sign-In |
+| **Database** | Cloud Firestore (real-time) |
+| **Image Hosting** | Cloudinary (unsigned uploads) |
+| **State Management** | Provider (ChangeNotifier) |
+| **HTTP** | `http` package (for Cloudinary API) |
+| **Caching** | `cached_network_image` |
+| **Sharing** | `share_plus` |
+| **Date Formatting** | `intl` |
+
+---
+
+## 📂 Project Structure
+
+```
 lib/
-├── config/             # Environment & backend configurations
-├── constants/          # Application-wide themes, colors, and layout metrics
-├── models/             # Data serialization classes (Post, Chat, Message)
-├── navigation/         # Centralized AppRouter and bottom tab orchestrator
-├── providers/          # AuthProvider for reactive profile state
+├── main.dart                    # App entry point, immersive mode setup
+├── constants/
+│   └── theme.dart               # Colors, spacing, radius, typography
+├── models/
+│   ├── post_model.dart          # Post data model (Firestore serialization)
+│   ├── chat_model.dart          # Chat room data model
+│   └── message_model.dart       # Message data model
+├── navigation/
+│   └── app_router.dart          # Auth-aware routing, bottom nav shell
+├── providers/
+│   └── auth_provider.dart       # Reactive auth state (ChangeNotifier)
 ├── screens/
-│   ├── auth/           # Haramaya branded Login
-│   ├── chat/           # Chat list tracking and real-time private messaging
-│   ├── feed/           # Main item feed and post creation wizard
-│   ├── saved/          # Swipeable saved items view
-│   └── profile/        # User profile, statistics, and editing
-├── services/           # External API calls (Firestore, Cloudinary)
-├── widgets/            # Reusable UI components
-└── main.dart           # App entry point & System UI Edge-to-Edge binding
+│   ├── auth/
+│   │   ├── login_screen.dart    # Email/password + Google login
+│   │   └── register_screen.dart # New user registration
+│   ├── feed/
+│   │   ├── feed_screen.dart     # Main feed with search & filters
+│   │   ├── item_details_screen.dart  # Item detail view + contact owner
+│   │   └── post_item_screen.dart     # Create new lost/found post
+│   ├── chat/
+│   │   ├── chat_list_screen.dart     # All conversations
+│   │   └── chat_room_screen.dart     # Real-time messaging
+│   ├── saved/
+│   │   └── saved_screen.dart    # Bookmarked items
+│   └── profile/
+│       ├── profile_screen.dart  # User profile + own posts
+│       └── edit_profile_screen.dart  # Edit name/photo
+├── services/
+│   ├── auth_service.dart        # Firebase Auth + Google Sign-In logic
+│   ├── post_service.dart        # CRUD for posts collection
+│   ├── chat_service.dart        # Chat rooms + messaging
+│   ├── saved_posts_service.dart # Saved/bookmarked items
+│   └── image_upload_service.dart # Cloudinary image uploads
+└── widgets/
+    ├── post_card.dart           # Reusable post card component
+    ├── app_button.dart          # Styled button component
+    └── app_input.dart           # Styled text input component
 ```
 
 ---
 
 ## 🚀 Getting Started
 
-Follow these steps to run the project locally.
-
 ### Prerequisites
-- [Flutter SDK](https://docs.flutter.dev/get-started/install) (version 3.x)
-- Android Studio / XCode for device emulation
 
-### 1. Install Dependencies
+- [Flutter SDK](https://docs.flutter.dev/get-started/install) (3.5+)
+- Android Studio or physical Android device
+- A Firebase project with **Auth** and **Firestore** enabled
+- A [Cloudinary](https://cloudinary.com/) account (free tier)
+
+### 1. Clone & Install
+
 ```bash
+git clone <repository-url>
+cd found_lost_flutter
 flutter pub get
 ```
 
-### 2. Configure Images (Cloudinary)
-By default, the app uses Cloudinary for free image uploads. In `lib/services/image_upload_service.dart`, ensure your `cloudName` and `uploadPreset` are correctly defined.
+### 2. Firebase Setup
 
-### 3. Firebase Configuration
-The Android runner uses a `google-services.json` file inside `android/app/` with the registered SHA-1 and SHA-256 fingerprints for Google Sign-In.
+1. Create a Firebase project at [console.firebase.google.com](https://console.firebase.google.com/)
+2. Enable **Email/Password** and **Google** sign-in methods
+3. Create a **Cloud Firestore** database
+4. Download `google-services.json` and place it in `android/app/`
+5. Register your app's **SHA-1** and **SHA-256** fingerprints for Google Sign-In
 
-### 4. Run the App
-Connect a physical device or run an emulator, then:
+### 3. Cloudinary Setup
+
+1. Create a free account at [cloudinary.com](https://cloudinary.com/)
+2. Go to **Settings → Upload → Upload Presets**
+3. Create an **Unsigned** upload preset
+4. Update `lib/services/image_upload_service.dart` with your:
+   - `cloudName` — from your Cloudinary dashboard
+   - `uploadPreset` — from the preset you just created
+
+### 4. Run
+
 ```bash
 flutter run
 ```
 
 ---
 
-## 📝 Design Philosophy
+## 🎨 Design System
 
-We prioritized a **vibrant, highly accessible premium UI**, replacing generic browser-default colors with an attractive Haramaya University theme map:
-- **Navigation:** Native Android system buttons are styled beautifully and pushed behind a clean App background.
-- **Lost Items** are highlighted with a distinct Red (`#FF3B30`).
-- **Found Items** are highlighted with a calming Green (`#34C759`).
-- Standard UI actions follow a strong guiding Blue primary color (`#007AFF`).
+| Token | Value | Usage |
+|---|---|---|
+| **Primary** | `#007AFF` | Buttons, links, active states |
+| **Secondary** | `#34C759` | Found items, success states |
+| **Danger** | `#FF3B30` | Lost items, errors, delete actions |
+| **Warning** | `#FF9500` | Alerts, caution states |
+| **Background** | `#F2F2F7` | Page backgrounds |
+| **Surface** | `#FFFFFF` | Cards, inputs, nav bar |
+| **Text Primary** | `#1C1C1E` | Headings, body text |
+| **Text Secondary** | `#8E8E93` | Captions, hints |
 
-The visual hierarchy separates form from background gracefully using subtle drop shadows, rounded cards, and smooth transitions.
+---
+
+## 📄 License
+
+This project is developed for **Haramaya University** campus use.
+
+---
+
+> Built with ❤️ using Flutter & Firebase

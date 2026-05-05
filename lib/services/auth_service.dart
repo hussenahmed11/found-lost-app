@@ -13,8 +13,12 @@ class AuthService {
   /// Current user.
   User? get currentUser => _auth.currentUser;
 
-  /// Sign in with Google (Default for students)
+  /// Sign in with Google (Default for students).
+  /// Always shows the Google account chooser by signing out first.
   Future<UserCredential?> signInWithGoogle() async {
+    // Force account chooser every time — sign out any cached Google session
+    await _googleSignIn.signOut();
+
     final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
     if (googleUser == null) return null; // user canceled
 
@@ -77,41 +81,9 @@ class AuthService {
     return null;
   }
 
-  /// Sign in with Google.
-  Future<UserCredential?> signInWithGoogle() async {
-    final GoogleSignIn googleSignIn = GoogleSignIn();
-
-    final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-    if (googleUser == null) {
-      return null; // User canceled
-    }
-
-    final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-    final AuthCredential credential = GoogleAuthProvider.credential(
-      accessToken: googleAuth.accessToken,
-      idToken: googleAuth.idToken,
-    );
-
-    final UserCredential userCredential = await _auth.signInWithCredential(credential);
-    final User? user = userCredential.user;
-
-    if (user != null) {
-      final doc = await _db.collection('users').doc(user.uid).get();
-      if (!doc.exists) {
-        final profileData = {
-          'uid': user.uid,
-          'name': user.displayName ?? 'Unknown',
-          'email': user.email ?? '',
-          'createdAt': DateTime.now().toIso8601String(),
-          'profileImage': user.photoURL,
-          'role': 'student',
-        };
-        await _db.collection('users').doc(user.uid).set(profileData);
-      }
-    }
-    return userCredential;
+  /// Sign out from both Firebase and Google.
+  Future<void> logout() async {
+    await _googleSignIn.signOut();
+    await _auth.signOut();
   }
-
-  /// Sign out.
-  Future<void> logout() => _auth.signOut();
 }

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../constants/theme.dart';
 import '../providers/auth_provider.dart';
@@ -13,6 +12,7 @@ import '../screens/saved/saved_screen.dart';
 import '../screens/chat/chat_list_screen.dart';
 import '../screens/chat/chat_room_screen.dart';
 import '../screens/profile/profile_screen.dart';
+import '../screens/profile/edit_profile_screen.dart';
 
 /// Main app widget that handles auth-aware routing and bottom navigation.
 class AppRouter extends StatelessWidget {
@@ -68,6 +68,9 @@ class AppRouter extends StatelessWidget {
                       chatId: args['chatId'],
                       otherUserId: args['otherUserId'],
                     ));
+          case '/edit-profile':
+            return MaterialPageRoute(
+                builder: (_) => const EditProfileScreen());
           default:
             return null;
         }
@@ -165,7 +168,7 @@ class _MainShellState extends State<MainShell> {
                 borderRadius: BorderRadius.circular(14),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.3),
+                    color: AppColors.primary.withOpacity(0.3),
                     offset: const Offset(0, 3),
                     blurRadius: 6,
                   ),

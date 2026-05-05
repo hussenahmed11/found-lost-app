@@ -2,45 +2,121 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../constants/theme.dart';
 import '../../models/post_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/chat_service.dart';
 import '../../services/saved_posts_service.dart';
+import '../../services/network_helper.dart';
 import '../../widgets/app_button.dart';
-import '../../services/chat_service.dart';
-import '../../providers/auth_provider.dart';
 
 class ItemDetailsScreen extends StatefulWidget {
   final Post post;
 
   const ItemDetailsScreen({super.key, required this.post});
 
-  void _handleContact(BuildContext context) async {
-    final currentUserId = Provider.of<AuthProvider>(context, listen: false).user?.uid;
+  @override
+  State<ItemDetailsScreen> createState() => _ItemDetailsScreenState();
+}
+
+class _ItemDetailsScreenState extends State<ItemDetailsScreen> {
+  final ChatService _chatService = ChatService();
+  final SavedPostsService _savedService = SavedPostsService();
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
+
+  bool _isSaved = false;
+  bool _contactLoading = false;
+  Map<String, dynamic>? _posterProfile;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPosterProfile();
+    _checkIfSaved();
+  }
+
+  Future<void> _loadPosterProfile() async {
+    try {
+      final doc = await _db
+          .collection('users')
+          .doc(widget.post.userId)
+          .get();
+      if (doc.exists && mounted) {
+        setState(() => _posterProfile = doc.data());
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _checkIfSaved() async {
+    final uid = context.read<AuthProvider>().user?.uid;
+    if (uid == null) return;
+    try {
+      final saved = await _savedService.isSaved(uid, widget.post.id);
+      if (mounted) setState(() => _isSaved = saved);
+    } catch (_) {}
+  }
+
+  Future<void> _toggleSave() async {
+    final uid = context.read<AuthProvider>().user?.uid;
+    if (uid == null) return;
+    try {
+      await _savedService.toggleSaved(uid, widget.post.id);
+      if (mounted) setState(() => _isSaved = !_isSaved);
+    } catch (e) {
+      if (mounted) NetworkHelper.showErrorSnackbar(context, e);
+    }
+  }
+
+  Future<void> _handleContact() async {
+    final currentUserId =
+        Provider.of<AuthProvider>(context, listen: false).user?.uid;
     if (currentUserId == null) return;
-    
-    if (currentUserId == post.userId) {
+
+    if (currentUserId == widget.post.userId) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You cannot chat with yourself.')),
+        const SnackBar(
+          content: Text('You cannot chat with yourself.'),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
 
+    setState(() => _contactLoading = true);
+
     try {
-      final chatId = await ChatService().createOrGetChat(currentUserId, post.userId);
-      if (context.mounted) {
+      // Check connectivity first
+      final hasInternet = await NetworkHelper.hasInternetConnection();
+      if (!hasInternet && mounted) {
+        final shouldRetry = await NetworkHelper.showNoInternetDialog(context);
+        if (shouldRetry) {
+          // Retry once
+          return _handleContact();
+        }
+        if (mounted) setState(() => _contactLoading = false);
+        return;
+      }
+
+      // Create or get the deterministic chat between these two users
+      final chatId = await _chatService.createOrGetChat(
+          currentUserId, widget.post.userId);
+
+      if (mounted) {
         Navigator.of(context).pushNamed(
           '/chat-room',
-          arguments: {'chatId': chatId, 'otherUserId': post.userId},
+          arguments: {
+            'chatId': chatId,
+            'otherUserId': widget.post.userId,
+          },
         );
       }
     } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to start chat: $e')),
-        );
+      if (mounted) {
+        NetworkHelper.showErrorSnackbar(context, e);
       }
+    } finally {
+      if (mounted) setState(() => _contactLoading = false);
     }
   }
 
@@ -76,7 +152,7 @@ class ItemDetailsScreen extends StatefulWidget {
                           child: widget.post.imageUrl != null
                               ? Image.network(widget.post.imageUrl!,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (_, __, a) => Container(
+                                  errorBuilder: (_, __, ___) => Container(
                                       color: AppColors.border,
                                       child: const Icon(Icons.image,
                                           size: 60,
@@ -370,7 +446,7 @@ class ItemDetailsScreen extends StatefulWidget {
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
+              color: Colors.black.withOpacity(0.1),
               blurRadius: 4,
             ),
           ],

@@ -1,12 +1,9 @@
-import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import '../models/post_model.dart';
 import 'image_upload_service.dart';
 
 class PostService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance;
   static const String _collection = 'posts';
 
   /// Create a new post, optionally uploading an image first via Cloudinary.
@@ -29,33 +26,41 @@ class PostService {
     return await _db.collection(_collection).add(post);
   }
 
-  /// Stream of posts with optional filters.
+  /// Stream of all posts ordered by creation date.
+  /// Filtering by type and category is done client-side to avoid
+  /// Firestore composite index requirements (failed-precondition error).
   Stream<List<Post>> getPosts({String? type, String? category}) {
-    Query query = _db.collection(_collection).orderBy('createdAt', descending: true);
-
-    return query.snapshots().map((snapshot) {
+    // Simple query — only orderBy createdAt, no compound where + orderBy
+    return _db
+        .collection(_collection)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
       var posts = snapshot.docs.map((doc) => Post.fromFirestore(doc)).toList();
-      
+
+      // Client-side filtering to avoid Firestore index errors
       if (type != null && type.toLowerCase() != 'all') {
         posts = posts.where((p) => p.type.toLowerCase() == type.toLowerCase()).toList();
       }
       if (category != null && category.toLowerCase() != 'all') {
-        posts = posts.where((p) => p.category == category).toList();
+        posts = posts.where((p) => p.category.toLowerCase() == category.toLowerCase()).toList();
       }
-      
+
       return posts;
     });
   }
 
   /// Stream of posts for a specific user.
+  /// Uses client-side filtering to avoid Firestore composite index requirement.
   Stream<List<Post>> getUserPosts(String userId) {
     return _db
         .collection(_collection)
-        .where('userId', isEqualTo: userId)
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) =>
-            snapshot.docs.map((doc) => Post.fromFirestore(doc)).toList());
+        .map((snapshot) => snapshot.docs
+            .map((doc) => Post.fromFirestore(doc))
+            .where((post) => post.userId == userId)
+            .toList());
   }
 
   /// Get a single post by ID.

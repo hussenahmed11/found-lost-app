@@ -5,6 +5,7 @@ import 'dart:io';
 import '../../constants/theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/post_service.dart';
+import '../../services/network_helper.dart';
 import '../../widgets/app_input.dart';
 import '../../widgets/app_button.dart';
 
@@ -75,6 +76,15 @@ class _PostItemScreenState extends State<PostItemScreen> {
 
     setState(() => _loading = true);
 
+    // Check connectivity first
+    final hasInternet = await NetworkHelper.hasInternetConnection();
+    if (!hasInternet && mounted) {
+      setState(() => _loading = false);
+      final shouldRetry = await NetworkHelper.showNoInternetDialog(context);
+      if (shouldRetry) return _handleSubmit();
+      return;
+    }
+
     try {
       final postData = {
         'title': _titleController.text.trim(),
@@ -120,7 +130,7 @@ class _PostItemScreenState extends State<PostItemScreen> {
     } catch (error) {
       if (mounted) {
         setState(() => _loading = false);
-        _showError('Failed to post item: $error');
+        NetworkHelper.showErrorSnackbar(context, error);
       }
     }
   }
@@ -128,9 +138,16 @@ class _PostItemScreenState extends State<PostItemScreen> {
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white, size: 20),
+            const SizedBox(width: 8),
+            Expanded(child: Text(message)),
+          ],
+        ),
         backgroundColor: AppColors.danger,
         behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
@@ -188,7 +205,7 @@ class _PostItemScreenState extends State<PostItemScreen> {
                                 child: Container(
                                   padding: const EdgeInsets.all(4),
                                   decoration: BoxDecoration(
-                                    color: Colors.black.withValues(alpha: 0.5),
+                                    color: Colors.black.withOpacity(0.5),
                                     shape: BoxShape.circle,
                                   ),
                                   child: const Icon(Icons.close,
@@ -204,7 +221,7 @@ class _PostItemScreenState extends State<PostItemScreen> {
                         children: [
                           Icon(Icons.camera_alt,
                               size: 40,
-                              color: AppColors.textSecondary.withValues(alpha: 0.6)),
+                              color: AppColors.textSecondary.withOpacity(0.6)),
                           const SizedBox(height: 8),
                           const Text(
                             'Add Photo (optional)',
@@ -218,7 +235,7 @@ class _PostItemScreenState extends State<PostItemScreen> {
                             'Tap to select from gallery',
                             style: TextStyle(
                               fontSize: 12,
-                              color: AppColors.textSecondary.withValues(alpha: 0.6),
+                              color: AppColors.textSecondary.withOpacity(0.6),
                             ),
                           ),
                         ],

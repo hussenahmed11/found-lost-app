@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import '../../constants/theme.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/network_helper.dart';
 import '../../widgets/app_input.dart';
 import '../../widgets/app_button.dart';
 
@@ -47,18 +47,47 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
+    final authProvider = context.read<AuthProvider>();
     setState(() => _loading = true);
+
+    // Check connectivity first
+    final hasInternet = await NetworkHelper.hasInternetConnection();
+    if (!hasInternet && mounted) {
+      setState(() => _loading = false);
+      final shouldRetry = await NetworkHelper.showNoInternetDialog(context);
+      if (shouldRetry) return _handleLogin();
+      return;
+    }
+
     try {
-      await context.read<AuthProvider>().login(email, password);
+      await authProvider.login(email, password);
     } catch (error) {
       if (mounted) {
-        String errorMsg = error.toString();
-        if (errorMsg.contains('SocketException') || errorMsg.contains('Failed host lookup') || errorMsg.contains('network_error')) {
-          errorMsg = 'Connection failed. Please check your internet and try again.';
-        } else if (error is FirebaseAuthException) {
-          errorMsg = error.message ?? 'Authentication failed';
-        }
-        _showError(errorMsg);
+        NetworkHelper.showErrorSnackbar(context, error);
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _handleGoogleSignIn() async {
+    final authProvider = context.read<AuthProvider>();
+    setState(() => _loading = true);
+
+    // Check connectivity first
+    final hasInternet = await NetworkHelper.hasInternetConnection();
+    if (!hasInternet && mounted) {
+      setState(() => _loading = false);
+      final shouldRetry = await NetworkHelper.showNoInternetDialog(context);
+      if (shouldRetry) return _handleGoogleSignIn();
+      return;
+    }
+
+    try {
+      await authProvider.signInWithGoogle();
+    } catch (error) {
+      if (mounted) {
+        NetworkHelper.showErrorSnackbar(context, error);
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -68,9 +97,16 @@ class _LoginScreenState extends State<LoginScreen> {
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white, size: 20),
+            const SizedBox(width: 8),
+            Expanded(child: Text(message)),
+          ],
+        ),
         backgroundColor: AppColors.danger,
         behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
@@ -188,11 +224,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
 
                 const SizedBox(height: AppSpacing.l),
-                Row(
+                const Row(
                   children: [
-                    const Expanded(child: Divider(color: AppColors.border)),
+                    Expanded(child: Divider(color: AppColors.border)),
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.m),
+                      padding: EdgeInsets.symmetric(horizontal: AppSpacing.m),
                       child: Text(
                         'OR',
                         style: TextStyle(
@@ -202,24 +238,13 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                     ),
-                    const Expanded(child: Divider(color: AppColors.border)),
+                    Expanded(child: Divider(color: AppColors.border)),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.m),
 
                 OutlinedButton.icon(
-                  onPressed: () async {
-                    setState(() => _loading = true);
-                    try {
-                      await context.read<AuthProvider>().signInWithGoogle();
-                    } catch (error) {
-                      if (mounted) {
-                        _showError(error.toString());
-                      }
-                    } finally {
-                      if (mounted) setState(() => _loading = false);
-                    }
-                  },
+                  onPressed: _loading ? null : _handleGoogleSignIn,
                   icon: Image.asset('assets/google_logo.png', height: 24),
                   label: const Text(
                     'Sign in with Google',
